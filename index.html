@@ -471,6 +471,63 @@
   }
   .clause-explanation { font-size: 13px; color: var(--muted); line-height: 1.7; }
 
+  /* NEGOTIATION SUGGESTION */
+  .clause-negotiation {
+    margin-top: 12px;
+    background: rgba(200,255,0,0.05);
+    border: 1px solid rgba(200,255,0,0.15);
+    border-radius: 6px;
+    padding: 12px 14px;
+  }
+  .clause-negotiation-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--lime);
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .clause-negotiation-text {
+    font-size: 12px;
+    color: #c8ff0099;
+    line-height: 1.6;
+    font-family: var(--font-mono);
+  }
+
+  /* INDIAN LAW REFERENCE */
+  .clause-laws {
+    margin-top: 10px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .law-tag {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.5px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    background: rgba(255,68,68,0.08);
+    border: 1px solid rgba(255,68,68,0.25);
+    color: #ff8888;
+    white-space: nowrap;
+  }
+  .clause-laws-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--danger);
+    margin-top: 10px;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
   /* HIGHLIGHTED TEXT */
   .highlighted-section {
     display: none;
@@ -958,7 +1015,13 @@ Return ONLY valid JSON in this exact format:
   "dangerKeywords": ["dangerous phrase 1", "dangerous phrase 2"],
   "reviewKeywords": ["review phrase 1", "review phrase 2"],
   "clauses": [
-    { "title": "5 word max title", "explanation": "2-3 sentence plain English explanation", "risk": "Safe|Review|Danger" }
+    {
+      "title": "5 word max title",
+      "explanation": "2-3 sentence plain English explanation",
+      "risk": "Safe|Review|Danger",
+      "negotiation": "For Danger or Review clauses only: suggest a specific fairer alternative clause wording the reader could propose. For Safe clauses set to null.",
+      "indianLaws": ["For Danger clauses only: list relevant Indian laws/acts being violated or bent, e.g. Indian Contract Act 1872 S.23, Consumer Protection Act 2019 S.47. For Safe or Review clauses set to empty array []"]
+    }
   ]
 }
 
@@ -966,6 +1029,9 @@ Risk definitions:
 - Safe: fair and balanced clause
 - Review: unusual, ambiguous, or slightly one-sided
 - Danger: exploitative, illegal, or heavily one-sided against the reader
+
+For negotiation: write a concrete alternative clause the reader can actually propose, starting with action words like "Replace with:" or "Propose:".
+For indianLaws: cite specific section numbers where possible. Only populate for Danger clauses.
 
 Document text:
 ---
@@ -983,7 +1049,7 @@ ${text.slice(0, 12000)}
         },
         body: JSON.stringify({
           model: MODEL_ANALYZE,
-          max_tokens: 3000,
+          max_tokens: 6000,
           temperature: 0.2,
           messages: [{ role: 'user', content: prompt }]
         })
@@ -1043,12 +1109,27 @@ ${text.slice(0, 12000)}
       const card = document.createElement('div');
       card.className = 'clause-card ' + (c.risk || 'Safe');
       card.style.animationDelay = (i * 0.05) + 's';
+
+      const negotiationHtml = (c.negotiation && (c.risk === 'Danger' || c.risk === 'Review'))
+        ? `<div class="clause-negotiation">
+            <div class="clause-negotiation-label">⚖ Negotiation Suggestion</div>
+            <div class="clause-negotiation-text">${escHtml(c.negotiation)}</div>
+           </div>`
+        : '';
+
+      const lawsHtml = (c.indianLaws && c.indianLaws.length > 0 && c.risk === 'Danger')
+        ? `<div class="clause-laws-label">⚠ Indian Laws Referenced</div>
+           <div class="clause-laws">${c.indianLaws.map(l => `<span class="law-tag">${escHtml(l)}</span>`).join('')}</div>`
+        : '';
+
       card.innerHTML = `
         <div class="clause-header">
           <div class="clause-title">${escHtml(c.title || 'Clause ' + (i+1))}</div>
           <span class="risk-badge badge-${c.risk || 'Safe'}">${c.risk || 'Safe'}</span>
         </div>
-        <div class="clause-explanation">${escHtml(c.explanation || '')}</div>`;
+        <div class="clause-explanation">${escHtml(c.explanation || '')}</div>
+        ${lawsHtml}
+        ${negotiationHtml}`;
       list.appendChild(card);
     });
 
