@@ -1,0 +1,1246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ClearClause — Legal Document Analyzer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+  :root {
+    --bg: #080808;
+    --bg2: #0f0f0f;
+    --bg3: #161616;
+    --border: #222;
+    --lime: #C8FF00;
+    --lime-dim: rgba(200,255,0,0.12);
+    --lime-glow: rgba(200,255,0,0.25);
+    --text: #f0f0f0;
+    --muted: #888;
+    --danger: #ff4444;
+    --danger-dim: rgba(255,68,68,0.12);
+    --review: #ff9900;
+    --review-dim: rgba(255,153,0,0.12);
+    --safe: #00cc66;
+    --safe-dim: rgba(0,204,102,0.12);
+    --font-head: 'Bebas Neue', sans-serif;
+    --font-body: 'DM Sans', sans-serif;
+    --font-mono: 'DM Mono', monospace;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+    font-size: 15px;
+    line-height: 1.6;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* SCROLLBAR */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 3px; }
+
+  /* ANIMATIONS */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(24px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+  @keyframes meterFill {
+    from { width: 0%; }
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+  @keyframes scanline {
+    0% { transform: translateY(-100%); }
+    100% { transform: translateY(100vh); }
+  }
+  .fadeUp { animation: fadeUp 0.6s ease both; }
+  .fadeUp-1 { animation-delay: 0.1s; }
+  .fadeUp-2 { animation-delay: 0.2s; }
+  .fadeUp-3 { animation-delay: 0.3s; }
+  .fadeUp-4 { animation-delay: 0.4s; }
+
+  /* HEADER */
+  header {
+    position: sticky; top: 0; z-index: 100;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 32px;
+    height: 60px;
+    background: rgba(8,8,8,0.92);
+    backdrop-filter: blur(16px);
+    border-bottom: 1px solid var(--border);
+  }
+  .logo {
+    font-family: var(--font-head);
+    font-size: 28px;
+    letter-spacing: 3px;
+    color: var(--lime);
+    text-shadow: 0 0 20px var(--lime-glow);
+    user-select: none;
+  }
+  .logo span { color: #fff; }
+  .header-actions { display: flex; gap: 10px; align-items: center; }
+  .btn-ghost {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 7px 14px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.2s;
+  }
+  .btn-ghost:hover { border-color: var(--lime); color: var(--lime); }
+  .lang-toggle {
+    display: flex;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .lang-btn {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    padding: 7px 12px;
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .lang-btn.active { background: var(--lime); color: #000; font-weight: 600; }
+
+  /* WARNING BAR */
+  .warning-bar {
+    background: rgba(255,153,0,0.08);
+    border-bottom: 1px solid rgba(255,153,0,0.3);
+    padding: 10px 32px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--review);
+    display: none;
+  }
+  .warning-bar.show { display: flex; }
+  .warning-bar button { background: none; border: 1px solid var(--review); color: var(--review); font-family: var(--font-mono); font-size: 11px; padding: 3px 10px; border-radius: 3px; cursor: pointer; margin-left: 8px; }
+  .warning-bar button:hover { background: var(--review); color: #000; }
+
+  /* MAIN CONTENT */
+  main { max-width: 860px; margin: 0 auto; padding: 60px 24px 100px; }
+
+  /* HERO */
+  .hero { text-align: center; margin-bottom: 56px; }
+  .hero-tag {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--lime);
+    background: var(--lime-dim);
+    border: 1px solid rgba(200,255,0,0.2);
+    padding: 5px 14px;
+    border-radius: 20px;
+    margin-bottom: 20px;
+  }
+  .hero h1 {
+    font-family: var(--font-head);
+    font-size: clamp(52px, 8vw, 88px);
+    line-height: 1;
+    letter-spacing: 2px;
+    color: #fff;
+    margin-bottom: 16px;
+  }
+  .hero h1 em { color: var(--lime); font-style: normal; }
+  .hero p {
+    font-size: 16px;
+    color: var(--muted);
+    max-width: 480px;
+    margin: 0 auto;
+    font-weight: 300;
+  }
+
+  /* UPLOAD ZONE */
+  .upload-zone {
+    border: 2px dashed var(--border);
+    border-radius: 12px;
+    padding: 52px 32px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.25s;
+    background: var(--bg2);
+    position: relative;
+    margin-bottom: 20px;
+  }
+  .upload-zone:hover, .upload-zone.drag-over {
+    border-color: var(--lime);
+    background: var(--lime-dim);
+  }
+  .upload-zone input[type="file"] {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    opacity: 0; cursor: pointer;
+  }
+  .upload-icon { font-size: 40px; margin-bottom: 12px; display: block; }
+  .upload-zone h3 {
+    font-family: var(--font-head);
+    font-size: 22px;
+    letter-spacing: 1px;
+    color: #fff;
+    margin-bottom: 6px;
+  }
+  .upload-zone p { font-size: 13px; color: var(--muted); }
+  .upload-zone .file-types {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--lime);
+    margin-top: 10px;
+    letter-spacing: 1px;
+  }
+  .file-selected {
+    display: none;
+    align-items: center;
+    gap: 12px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin-bottom: 20px;
+    font-family: var(--font-mono);
+    font-size: 13px;
+  }
+  .file-selected.show { display: flex; }
+  .file-icon { font-size: 22px; }
+  .file-name { color: var(--text); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .file-size { color: var(--muted); font-size: 11px; }
+  .btn-clear { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 18px; padding: 0 4px; transition: color 0.2s; }
+  .btn-clear:hover { color: var(--danger); }
+
+  /* ANALYZE BUTTON */
+  .btn-analyze {
+    display: none;
+    width: 100%;
+    padding: 16px;
+    background: var(--lime);
+    color: #000;
+    font-family: var(--font-head);
+    font-size: 20px;
+    letter-spacing: 3px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-bottom: 20px;
+    position: relative;
+    overflow: hidden;
+  }
+  .btn-analyze::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.15) 50%, transparent 100%);
+    transform: translateX(-100%);
+    transition: transform 0.4s;
+  }
+  .btn-analyze:hover::after { transform: translateX(100%); }
+  .btn-analyze:hover { background: #d4ff1a; box-shadow: 0 0 30px var(--lime-glow); }
+  .btn-analyze.show { display: block; }
+  .btn-analyze:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* SPINNER */
+  .loading {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    padding: 48px;
+    text-align: center;
+  }
+  .loading.show { display: flex; }
+  .spinner {
+    width: 40px; height: 40px;
+    border: 3px solid var(--border);
+    border-top-color: var(--lime);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  .loading-text {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 2px;
+    color: var(--muted);
+    text-transform: uppercase;
+    animation: pulse 1.5s ease infinite;
+  }
+
+  /* ERROR */
+  .error-box {
+    display: none;
+    background: var(--danger-dim);
+    border: 1px solid rgba(255,68,68,0.3);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-bottom: 20px;
+    font-size: 13px;
+    color: var(--danger);
+    font-family: var(--font-mono);
+  }
+  .error-box.show { display: block; }
+
+  /* RESULTS */
+  #results { display: none; }
+  #results.show { display: block; }
+
+  /* DOC TYPE TAG */
+  .doc-type-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    padding: 6px 14px;
+    border-radius: 20px;
+    color: var(--lime);
+    margin-bottom: 24px;
+  }
+
+  /* RISK METER */
+  .risk-meter {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 24px;
+  }
+  .risk-meter-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+  .risk-meter-title {
+    font-family: var(--font-head);
+    font-size: 14px;
+    letter-spacing: 2px;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+  .risk-score-number {
+    font-family: var(--font-head);
+    font-size: 36px;
+    color: #fff;
+  }
+  .meter-track {
+    height: 8px;
+    background: var(--bg3);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 14px;
+  }
+  .meter-fill {
+    height: 100%;
+    border-radius: 4px;
+    width: 0%;
+    transition: width 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .meter-labels {
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    gap: 12px;
+  }
+  .meter-label { display: flex; align-items: center; gap: 6px; }
+  .meter-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .count-num { color: #fff; font-weight: 500; }
+
+  /* OVERALL RISK BLOCK */
+  .overall-risk {
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 24px;
+    border-left: 4px solid transparent;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+  }
+  .overall-risk.Safe { border-left-color: var(--safe); }
+  .overall-risk.Review { border-left-color: var(--review); }
+  .overall-risk.Danger { border-left-color: var(--danger); }
+  .overall-risk-header { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+  .risk-badge {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 1px;
+    padding: 4px 12px;
+    border-radius: 20px;
+    text-transform: uppercase;
+  }
+  .badge-Safe { background: var(--safe-dim); color: var(--safe); border: 1px solid rgba(0,204,102,0.3); }
+  .badge-Review { background: var(--review-dim); color: var(--review); border: 1px solid rgba(255,153,0,0.3); }
+  .badge-Danger { background: var(--danger-dim); color: var(--danger); border: 1px solid rgba(255,68,68,0.3); }
+  .overall-title { font-family: var(--font-head); font-size: 18px; letter-spacing: 1px; color: #fff; }
+  .overall-summary { font-size: 14px; color: var(--muted); line-height: 1.7; }
+
+  /* TOOLBAR */
+  .toolbar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 28px;
+    flex-wrap: wrap;
+  }
+  .btn-tool {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 8px 16px;
+    border: 1px solid var(--border);
+    background: var(--bg2);
+    color: var(--muted);
+    cursor: pointer;
+    border-radius: 6px;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .btn-tool:hover { border-color: var(--lime); color: var(--lime); }
+  .btn-tool.active { border-color: var(--lime); color: var(--lime); background: var(--lime-dim); }
+
+  /* SECTION TITLE */
+  .section-title {
+    font-family: var(--font-head);
+    font-size: 16px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .section-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* CLAUSES */
+  .clauses-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 32px; }
+  .clause-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 20px;
+    border-left: 3px solid transparent;
+    animation: fadeUp 0.4s ease both;
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .clause-card:hover { background: var(--bg3); }
+  .clause-card.Safe { border-left-color: var(--safe); }
+  .clause-card.Review { border-left-color: var(--review); }
+  .clause-card.Danger { border-left-color: var(--danger); }
+  .clause-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; gap: 12px; }
+  .clause-title {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 500;
+    color: #fff;
+    flex: 1;
+  }
+  .clause-explanation { font-size: 13px; color: var(--muted); line-height: 1.7; }
+
+  /* HIGHLIGHTED TEXT */
+  .highlighted-section {
+    display: none;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 32px;
+    max-height: 360px;
+    overflow-y: auto;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    line-height: 1.8;
+    color: #aaa;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .highlighted-section.show { display: block; }
+  .hl-danger { background: rgba(255,68,68,0.2); color: var(--danger); border-radius: 2px; padding: 1px 2px; }
+  .hl-review { background: rgba(255,153,0,0.15); color: var(--review); border-radius: 2px; padding: 1px 2px; }
+
+  /* ASK SECTION */
+  .ask-section {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 32px;
+  }
+  .ask-input-row { display: flex; gap: 10px; margin-bottom: 16px; }
+  .ask-input {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 14px;
+    color: var(--text);
+    font-family: var(--font-body);
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .ask-input:focus { border-color: var(--lime); }
+  .btn-ask {
+    font-family: var(--font-head);
+    font-size: 16px;
+    letter-spacing: 2px;
+    padding: 10px 24px;
+    background: var(--lime);
+    color: #000;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  .btn-ask:hover { background: #d4ff1a; }
+  .btn-ask:disabled { opacity: 0.5; cursor: not-allowed; }
+  .ask-answer {
+    display: none;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    font-size: 14px;
+    color: var(--text);
+    line-height: 1.7;
+  }
+  .ask-answer.show { display: block; }
+  .ask-spinner { display: none; align-items: center; gap: 10px; font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
+  .ask-spinner.show { display: flex; }
+  .ask-spinner-icon { width: 16px; height: 16px; border: 2px solid var(--border); border-top-color: var(--lime); border-radius: 50%; animation: spin 0.7s linear infinite; }
+
+  /* MODAL */
+  .modal-overlay {
+    display: none;
+    position: fixed; inset: 0; z-index: 200;
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(6px);
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  .modal-overlay.show { display: flex; }
+  .modal {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 32px;
+    max-width: 420px;
+    width: 100%;
+    animation: fadeUp 0.3s ease;
+  }
+  .modal-title { font-family: var(--font-head); font-size: 22px; letter-spacing: 2px; color: #fff; margin-bottom: 6px; }
+  .modal-sub { font-size: 13px; color: var(--muted); margin-bottom: 24px; }
+  .modal label { font-family: var(--font-mono); font-size: 11px; letter-spacing: 1px; color: var(--muted); display: block; margin-bottom: 8px; text-transform: uppercase; }
+  .modal input {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 14px;
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.2s;
+    margin-bottom: 6px;
+    -webkit-user-select: text;
+    user-select: text;
+  }
+  .modal input:focus { border-color: var(--lime); }
+  .modal-hint { font-size: 12px; color: var(--muted); margin-bottom: 20px; font-family: var(--font-mono); }
+  .modal-hint.error { color: var(--danger); }
+  .modal-actions { display: flex; gap: 10px; }
+  .btn-save {
+    flex: 1;
+    padding: 12px;
+    background: var(--lime);
+    color: #000;
+    font-family: var(--font-head);
+    font-size: 16px;
+    letter-spacing: 2px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-save:hover { background: #d4ff1a; }
+  .btn-cancel {
+    padding: 12px 20px;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-cancel:hover { border-color: var(--danger); color: var(--danger); }
+
+  /* GRID LINES BG DECORATION */
+  .grid-bg {
+    position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    background-image:
+      linear-gradient(rgba(200,255,0,0.015) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(200,255,0,0.015) 1px, transparent 1px);
+    background-size: 60px 60px;
+  }
+  main { position: relative; z-index: 1; }
+</style>
+</head>
+<body>
+
+<div class="grid-bg"></div>
+
+<!-- HEADER -->
+<header>
+  <div class="logo">CLEAR<span>CLAUSE</span></div>
+  <div class="header-actions">
+    <div class="lang-toggle">
+      <button class="lang-btn active" data-lang="en" onclick="setLang('en')">EN</button>
+      <button class="lang-btn" data-lang="hi" onclick="setLang('hi')">HI</button>
+      <button class="lang-btn" data-lang="bn" onclick="setLang('bn')">BN</button>
+    </div>
+    <button class="btn-ghost" onclick="openModal()">⚙ API KEY</button>
+  </div>
+</header>
+
+<!-- WARNING BAR -->
+<div class="warning-bar" id="warningBar">
+  <span>⚠</span>
+  <span>No Groq API key set. Analysis will fail without it.</span>
+  <button onclick="openModal()">Set Key</button>
+</div>
+
+<!-- MAIN -->
+<main>
+  <!-- HERO -->
+  <div class="hero">
+    <div class="hero-tag fadeUp">AI-Powered Legal Analyzer</div>
+    <h1 class="fadeUp fadeUp-1">READ THE <em>FINE</em> PRINT</h1>
+    <p class="fadeUp fadeUp-2">Upload any legal document. Get a plain-English breakdown of every clause — with risk flags before you sign.</p>
+  </div>
+
+  <!-- UPLOAD ZONE -->
+  <div class="upload-zone fadeUp fadeUp-3" id="uploadZone"
+    ondragover="handleDragOver(event)"
+    ondragleave="handleDragLeave(event)"
+    ondrop="handleDrop(event)">
+    <input type="file" id="fileInput" accept=".pdf,image/*" onchange="handleFileSelect(event)">
+    <span class="upload-icon">📄</span>
+    <h3>Drop your document here</h3>
+    <p>or click to browse files</p>
+    <div class="file-types">PDF · JPG · PNG · WEBP · TIFF</div>
+  </div>
+
+  <!-- FILE SELECTED -->
+  <div class="file-selected" id="fileSelected">
+    <span class="file-icon" id="fileIcon">📄</span>
+    <span class="file-name" id="fileName">—</span>
+    <span class="file-size" id="fileSize">—</span>
+    <button class="btn-clear" onclick="clearFile()" title="Remove file">✕</button>
+  </div>
+
+  <!-- ANALYZE BUTTON -->
+  <button class="btn-analyze" id="analyzeBtn" onclick="analyze()">ANALYZE DOCUMENT</button>
+
+  <!-- LOADING -->
+  <div class="loading" id="loading">
+    <div class="spinner"></div>
+    <div class="loading-text" id="loadingText">Extracting text...</div>
+  </div>
+
+  <!-- ERROR -->
+  <div class="error-box" id="errorBox"></div>
+
+  <!-- RESULTS -->
+  <div id="results">
+    <div class="doc-type-tag" id="docTypeTag">📋 Document</div>
+
+    <!-- RISK METER -->
+    <div class="risk-meter fadeUp">
+      <div class="risk-meter-header">
+        <div class="risk-meter-title">Risk Score</div>
+        <div class="risk-score-number" id="riskScoreNum">0%</div>
+      </div>
+      <div class="meter-track">
+        <div class="meter-fill" id="meterFill" style="width:0%"></div>
+      </div>
+      <div class="meter-labels">
+        <div class="meter-label">
+          <div class="meter-dot" style="background:var(--safe)"></div>
+          <span style="color:var(--muted)">Safe</span>
+          <span class="count-num" id="countSafe">0</span>
+        </div>
+        <div class="meter-label">
+          <div class="meter-dot" style="background:var(--review)"></div>
+          <span style="color:var(--muted)">Review</span>
+          <span class="count-num" id="countReview">0</span>
+        </div>
+        <div class="meter-label">
+          <div class="meter-dot" style="background:var(--danger)"></div>
+          <span style="color:var(--muted)">Danger</span>
+          <span class="count-num" id="countDanger">0</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- OVERALL RISK -->
+    <div class="overall-risk" id="overallRisk">
+      <div class="overall-risk-header">
+        <span class="overall-title">Overall Assessment</span>
+        <span class="risk-badge" id="overallBadge">—</span>
+      </div>
+      <p class="overall-summary" id="overallSummary">—</p>
+    </div>
+
+    <!-- TOOLBAR -->
+    <div class="toolbar">
+      <button class="btn-tool" onclick="downloadReport()">↓ Download Report</button>
+      <button class="btn-tool" id="toggleHighlightBtn" onclick="toggleHighlight()">◈ Show Highlighted Text</button>
+    </div>
+
+    <!-- HIGHLIGHTED TEXT -->
+    <div class="highlighted-section" id="highlightedSection"></div>
+
+    <!-- CLAUSES -->
+    <div class="section-title">Clause Breakdown</div>
+    <div class="clauses-list" id="clausesList"></div>
+
+    <!-- ASK A QUESTION -->
+    <div class="section-title">Ask a Question</div>
+    <div class="ask-section">
+      <div class="ask-input-row">
+        <input class="ask-input" id="askInput" type="text" placeholder="Ask anything about this document..." onkeydown="if(event.key==='Enter')askQuestion()">
+        <button class="btn-ask" id="askBtn" onclick="askQuestion()">ASK</button>
+      </div>
+      <div class="ask-spinner" id="askSpinner">
+        <div class="ask-spinner-icon"></div>
+        <span>Thinking...</span>
+      </div>
+      <div class="ask-answer" id="askAnswer"></div>
+    </div>
+  </div>
+</main>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modalOverlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-title">API KEY</div>
+    <div class="modal-sub">Enter your Groq API key to enable document analysis.</div>
+    <label for="apiKeyInput">Groq API Key</label>
+    <input type="text" id="apiKeyInput" placeholder="gsk_..."
+      autocomplete="off"
+      autocorrect="off"
+      autocapitalize="off"
+      spellcheck="false"
+      inputmode="text"
+      style="-webkit-user-select:text;user-select:text;"
+      oninput="validateKeyInput()">
+    <div class="modal-hint" id="modalHint">Must start with gsk_</div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+      <button class="btn-save" id="saveKeyBtn" onclick="saveKey()">SAVE</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ── STATE ────────────────────────────────────────────
+  let selectedFile = null;
+  let extractedText = '';
+  let analysisResult = null;
+  let currentLang = 'en';
+  let highlightVisible = false;
+
+  const GROQ_ENDPOINT = 'https://api.groq.com/openai/v1/chat/completions';
+  const MODEL_ANALYZE = 'llama-3.3-70b-versatile';
+  const MODEL_VISION  = 'meta-llama/llama-4-scout-17b-16e-instruct';
+
+  // ── INIT ─────────────────────────────────────────────
+  window.addEventListener('DOMContentLoaded', () => {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    checkApiKey();
+  });
+
+  function getApiKey() { return localStorage.getItem('cc_groq_key') || ''; }
+  function checkApiKey() {
+    document.getElementById('warningBar').classList.toggle('show', !getApiKey());
+  }
+
+  // ── LANGUAGE ─────────────────────────────────────────
+  function setLang(l) {
+    currentLang = l;
+    document.querySelectorAll('.lang-btn').forEach(b => b.classList.toggle('active', b.dataset.lang === l));
+  }
+
+  // ── FILE HANDLING ─────────────────────────────────────
+  function handleDragOver(e) { e.preventDefault(); document.getElementById('uploadZone').classList.add('drag-over'); }
+  function handleDragLeave() { document.getElementById('uploadZone').classList.remove('drag-over'); }
+  function handleDrop(e) {
+    e.preventDefault();
+    document.getElementById('uploadZone').classList.remove('drag-over');
+    const f = e.dataTransfer.files[0];
+    if (f) setFile(f);
+  }
+  function handleFileSelect(e) { if (e.target.files[0]) setFile(e.target.files[0]); }
+
+  function setFile(f) {
+    const allowed = ['application/pdf','image/jpeg','image/png','image/webp','image/tiff','image/gif'];
+    if (!allowed.some(t => f.type.startsWith(t.split('/')[0]) || f.type === t)) {
+      showError('Unsupported file type. Please upload a PDF or image.'); return;
+    }
+    selectedFile = f;
+    hideError();
+    const icon = f.type === 'application/pdf' ? '📄' : '🖼';
+    document.getElementById('fileIcon').textContent = icon;
+    document.getElementById('fileName').textContent = f.name;
+    document.getElementById('fileSize').textContent = formatSize(f.size);
+    document.getElementById('fileSelected').classList.add('show');
+    document.getElementById('analyzeBtn').classList.add('show');
+    hideResults();
+  }
+
+  function clearFile() {
+    selectedFile = null; extractedText = ''; analysisResult = null;
+    document.getElementById('fileSelected').classList.remove('show');
+    document.getElementById('analyzeBtn').classList.remove('show');
+    document.getElementById('fileInput').value = '';
+    hideResults(); hideError();
+  }
+
+  function formatSize(b) {
+    if (b < 1024) return b + ' B';
+    if (b < 1024*1024) return (b/1024).toFixed(1) + ' KB';
+    return (b/(1024*1024)).toFixed(1) + ' MB';
+  }
+
+  // ── PDF EXTRACTION ────────────────────────────────────
+  async function extractPdfText(file) {
+    const ab = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: ab }).promise;
+    let text = '';
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const tc = await page.getTextContent();
+      text += tc.items.map(s => s.str).join(' ') + '\n';
+    }
+    return text.trim();
+  }
+
+  // ── IMAGE → TEXT via VISION ───────────────────────────
+  async function extractImageText(file) {
+    const key = getApiKey();
+    const base64 = await fileToBase64(file);
+    const mime = file.type || 'image/jpeg';
+    const body = {
+      model: MODEL_VISION,
+      max_tokens: 2000,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'image_url', image_url: { url: `data:${mime};base64,${base64}` } },
+          { type: 'text', text: 'Extract ALL text from this document image exactly as it appears. Output only the extracted text, nothing else.' }
+        ]
+      }]
+    };
+    let res;
+    try {
+      res = await fetch(GROQ_ENDPOINT, {
+        method: 'POST',
+        mode: 'cors',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${key}`
+        },
+        body: JSON.stringify(body)
+      });
+    } catch (fetchErr) {
+      throw new Error(`Network error during OCR: ${fetchErr.message}. Make sure your API key is correct and you have internet access.`);
+    }
+    let data;
+    try { data = await res.json(); } catch { throw new Error('Vision API returned an unreadable response.'); }
+    if (!res.ok) throw new Error(data.error?.message || `Vision API error (${res.status})`);
+    return data.choices[0].message.content.trim();
+  }
+
+  function fileToBase64(file) {
+    return new Promise((res, rej) => {
+      const r = new FileReader();
+      r.onload = () => res(r.result.split(',')[1]);
+      r.onerror = () => rej(new Error('File read error'));
+      r.readAsDataURL(file);
+    });
+  }
+
+  // ── ANALYSIS ──────────────────────────────────────────
+  async function analyze() {
+    if (!selectedFile) return;
+    const key = getApiKey();
+    if (!key) { openModal(); return; }
+
+    const btn = document.getElementById('analyzeBtn');
+    btn.disabled = true;
+    hideError(); hideResults();
+    showLoading('Extracting text...');
+
+    try {
+      if (selectedFile.type === 'application/pdf') {
+        extractedText = await extractPdfText(selectedFile);
+      } else {
+        setLoadingText('Running OCR...');
+        extractedText = await extractImageText(selectedFile);
+      }
+
+      if (!extractedText || extractedText.length < 20) throw new Error('Could not extract readable text from the document.');
+
+      setLoadingText('Analyzing clauses...');
+      analysisResult = await callGroqAnalysis(extractedText, key);
+
+      hideLoading();
+      renderResults(analysisResult, extractedText);
+    } catch (err) {
+      hideLoading();
+      showError(err.message || 'An unexpected error occurred.');
+    }
+    btn.disabled = false;
+  }
+
+  async function callGroqAnalysis(text, key) {
+    const langNote = currentLang === 'hi'
+      ? 'Respond with explanations and summary in Hindi. Keep JSON keys in English.'
+      : currentLang === 'bn'
+      ? 'Respond with explanations and summary in Bengali (Bangla). Keep JSON keys in English.'
+      : 'Respond in English.';
+
+    const prompt = `Analyze this legal document carefully. ${langNote}
+Return ONLY valid JSON in this exact format:
+{
+  "documentType": "Type of document",
+  "summary": "2-3 sentence summary",
+  "overallRisk": "Safe|Review|Danger",
+  "dangerKeywords": ["dangerous phrase 1", "dangerous phrase 2"],
+  "reviewKeywords": ["review phrase 1", "review phrase 2"],
+  "clauses": [
+    { "title": "5 word max title", "explanation": "2-3 sentence plain English explanation", "risk": "Safe|Review|Danger" }
+  ]
+}
+
+Risk definitions:
+- Safe: fair and balanced clause
+- Review: unusual, ambiguous, or slightly one-sided
+- Danger: exploitative, illegal, or heavily one-sided against the reader
+
+Document text:
+---
+${text.slice(0, 12000)}
+---`;
+
+    let res;
+    try {
+      res = await fetch(GROQ_ENDPOINT, {
+        method: 'POST',
+        mode: 'cors',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${key}`
+        },
+        body: JSON.stringify({
+          model: MODEL_ANALYZE,
+          max_tokens: 3000,
+          temperature: 0.2,
+          messages: [{ role: 'user', content: prompt }]
+        })
+      });
+    } catch (fetchErr) {
+      throw new Error(`Network error: ${fetchErr.message}. Check your internet connection and that your API key starts with gsk_.`);
+    }
+    let data;
+    try { data = await res.json(); } catch { throw new Error('Groq API returned an unreadable response.'); }
+    if (!res.ok) throw new Error(data.error?.message || `Groq API error (${res.status}): ${JSON.stringify(data)}`);
+    const raw = data.choices[0].message.content.trim();
+    const jsonStr = raw.replace(/```json|```/g, '').trim();
+    try { return JSON.parse(jsonStr); }
+    catch { throw new Error('Failed to parse AI response. Please try again.'); }
+  }
+
+  // ── RENDER ────────────────────────────────────────────
+  function renderResults(r, text) {
+    document.getElementById('docTypeTag').textContent = '📋 ' + (r.documentType || 'Legal Document');
+
+    const clauses = r.clauses || [];
+    const safe = clauses.filter(c => c.risk === 'Safe').length;
+    const review = clauses.filter(c => c.risk === 'Review').length;
+    const danger = clauses.filter(c => c.risk === 'Danger').length;
+    const total = clauses.length || 1;
+    const score = Math.round(((danger * 2 + review * 0.5) / (total * 2)) * 100);
+
+    document.getElementById('riskScoreNum').textContent = score + '%';
+    document.getElementById('countSafe').textContent = safe;
+    document.getElementById('countReview').textContent = review;
+    document.getElementById('countDanger').textContent = danger;
+
+    const fill = document.getElementById('meterFill');
+    const hexColor = score >= 60 ? '#ff4444' : score >= 30 ? '#ff9900' : '#00cc66';
+    const hexFade  = score >= 60 ? '#ff000066' : score >= 30 ? '#ff990066' : '#00cc6666';
+    fill.style.background = `linear-gradient(90deg, ${hexColor}, ${hexFade})`;
+    fill.style.boxShadow = `0 0 10px ${hexColor}88`;
+    fill.style.width = '0%';
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        fill.style.width = score + '%';
+      });
+    });
+
+    const risk = r.overallRisk || 'Review';
+    const overallEl = document.getElementById('overallRisk');
+    overallEl.className = 'overall-risk ' + risk;
+    const badge = document.getElementById('overallBadge');
+    badge.className = 'risk-badge badge-' + risk;
+    badge.textContent = risk;
+    document.getElementById('overallSummary').textContent = r.summary || '';
+
+    // Clauses
+    const list = document.getElementById('clausesList');
+    list.innerHTML = '';
+    clauses.forEach((c, i) => {
+      const card = document.createElement('div');
+      card.className = 'clause-card ' + (c.risk || 'Safe');
+      card.style.animationDelay = (i * 0.05) + 's';
+      card.innerHTML = `
+        <div class="clause-header">
+          <div class="clause-title">${escHtml(c.title || 'Clause ' + (i+1))}</div>
+          <span class="risk-badge badge-${c.risk || 'Safe'}">${c.risk || 'Safe'}</span>
+        </div>
+        <div class="clause-explanation">${escHtml(c.explanation || '')}</div>`;
+      list.appendChild(card);
+    });
+
+    // Highlighted text
+    const dangerKw = r.dangerKeywords || [];
+    const reviewKw = r.reviewKeywords || [];
+    const hlSection = document.getElementById('highlightedSection');
+    let hlText = escHtml(text.slice(0, 8000));
+    dangerKw.forEach(kw => {
+      if (!kw) return;
+      hlText = hlText.replace(new RegExp(escRegex(escHtml(kw)), 'gi'), m => `<span class="hl-danger">${m}</span>`);
+    });
+    reviewKw.forEach(kw => {
+      if (!kw) return;
+      hlText = hlText.replace(new RegExp(escRegex(escHtml(kw)), 'gi'), m => `<span class="hl-review">${m}</span>`);
+    });
+    hlSection.innerHTML = hlText;
+
+    showResults();
+    document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+  function escRegex(s) { return s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'); }
+
+  // ── TOOLBAR ACTIONS ───────────────────────────────────
+  function copyAnalysis() {
+    if (!analysisResult) return;
+    const r = analysisResult;
+    let t = `CLEARCLAUSE ANALYSIS REPORT\n${'='.repeat(40)}\n\n`;
+    t += `Document Type: ${r.documentType}\nOverall Risk: ${r.overallRisk}\n\nSummary:\n${r.summary}\n\n`;
+    t += `${'='.repeat(40)}\nCLAUSE BREAKDOWN\n${'='.repeat(40)}\n\n`;
+    (r.clauses||[]).forEach((c,i) => {
+      t += `[${c.risk}] ${c.title}\n${c.explanation}\n\n`;
+    });
+    navigator.clipboard.writeText(t).then(() => {
+      const btn = event.target; const orig = btn.textContent;
+      btn.textContent = '✓ Copied!'; btn.style.color = 'var(--lime)';
+      setTimeout(() => { btn.textContent = orig; btn.style.color = ''; }, 2000);
+    }).catch(() => showError('Clipboard access denied.'));
+  }
+
+  function downloadReport() {
+    if (!analysisResult) return;
+    const r = analysisResult;
+    const riskColors = { Safe: '#00cc66', Review: '#ff9900', Danger: '#ff4444' };
+    const clauseCards = (r.clauses||[]).map(c => `
+      <div style="border-left:3px solid ${riskColors[c.risk]||'#888'};background:#1a1a1a;border-radius:8px;padding:16px;margin-bottom:10px;">
+        <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+          <strong style="color:#fff;font-family:monospace">${c.title}</strong>
+          <span style="background:${riskColors[c.risk]}22;color:${riskColors[c.risk]};border-radius:12px;padding:2px 10px;font-size:11px;font-family:monospace">${c.risk}</span>
+        </div>
+        <div style="color:#aaa;font-size:13px">${c.explanation}</div>
+      </div>`).join('');
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>ClearClause Report</title></head>
+<body style="background:#080808;color:#f0f0f0;font-family:sans-serif;max-width:800px;margin:40px auto;padding:0 20px">
+<h1 style="color:#C8FF00;font-size:32px;letter-spacing:3px">CLEARCLAUSE REPORT</h1>
+<p style="color:#888;font-size:12px">Generated ${new Date().toLocaleString()}</p>
+<hr style="border-color:#222;margin:20px 0">
+<div style="background:#161616;border-radius:10px;padding:20px;margin-bottom:20px">
+<div style="color:#888;font-size:11px;letter-spacing:2px;font-family:monospace">DOCUMENT TYPE</div>
+<div style="color:#C8FF00;font-size:18px;margin-top:4px">${r.documentType}</div>
+</div>
+<div style="background:#161616;border-radius:10px;padding:20px;border-left:4px solid ${riskColors[r.overallRisk]||'#888'};margin-bottom:20px">
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
+<span style="font-size:16px;font-weight:600">Overall Assessment</span>
+<span style="background:${riskColors[r.overallRisk]}22;color:${riskColors[r.overallRisk]};border-radius:12px;padding:3px 12px;font-size:11px;font-family:monospace">${r.overallRisk}</span>
+</div>
+<p style="color:#aaa">${r.summary}</p>
+</div>
+<h2 style="font-size:14px;letter-spacing:2px;color:#888;margin-bottom:16px">CLAUSE BREAKDOWN</h2>
+${clauseCards}
+</body></html>`;
+    const blob = new Blob([html], { type: 'text/html' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'clearclause-report.html';
+    a.click();
+  }
+
+  function toggleHighlight() {
+    highlightVisible = !highlightVisible;
+    document.getElementById('highlightedSection').classList.toggle('show', highlightVisible);
+    const btn = document.getElementById('toggleHighlightBtn');
+    btn.classList.toggle('active', highlightVisible);
+    btn.textContent = highlightVisible ? '◈ Hide Highlighted Text' : '◈ Show Highlighted Text';
+  }
+
+  // ── ASK A QUESTION ────────────────────────────────────
+  async function askQuestion() {
+    const q = document.getElementById('askInput').value.trim();
+    if (!q || !extractedText) return;
+    const key = getApiKey();
+    if (!key) { openModal(); return; }
+
+    document.getElementById('askBtn').disabled = true;
+    document.getElementById('askSpinner').classList.add('show');
+    document.getElementById('askAnswer').classList.remove('show');
+
+    try {
+      const context = analysisResult
+        ? `Document Summary: ${analysisResult.summary}\nOverall Risk: ${analysisResult.overallRisk}\n\nDocument Text (first 6000 chars):\n${extractedText.slice(0,6000)}`
+        : extractedText.slice(0, 6000);
+
+      const res = await fetch(GROQ_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+        body: JSON.stringify({
+          model: MODEL_ANALYZE,
+          max_tokens: 600,
+          messages: [{
+            role: 'user',
+            content: `You are a legal document assistant. Based on the following legal document, answer this question clearly and concisely:\n\nQuestion: ${q}\n\nContext:\n${context}\n\nProvide a helpful, plain-English answer.`
+          }]
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error?.message || 'API error');
+      const answer = data.choices[0].message.content.trim();
+      const answerEl = document.getElementById('askAnswer');
+      answerEl.textContent = answer;
+      answerEl.classList.add('show');
+    } catch (err) {
+      const answerEl = document.getElementById('askAnswer');
+      answerEl.textContent = 'Error: ' + err.message;
+      answerEl.style.color = 'var(--danger)';
+      answerEl.classList.add('show');
+    }
+    document.getElementById('askBtn').disabled = false;
+    document.getElementById('askSpinner').classList.remove('show');
+  }
+
+  // ── UI HELPERS ────────────────────────────────────────
+  function showLoading(msg) {
+    document.getElementById('loadingText').textContent = msg || 'Processing...';
+    document.getElementById('loading').classList.add('show');
+    document.getElementById('analyzeBtn').classList.remove('show');
+  }
+  function setLoadingText(msg) { document.getElementById('loadingText').textContent = msg; }
+  function hideLoading() { document.getElementById('loading').classList.remove('show'); document.getElementById('analyzeBtn').classList.add('show'); }
+  function showError(msg) {
+    const el = document.getElementById('errorBox');
+    const isCors = msg.toLowerCase().includes('network error') || msg.toLowerCase().includes('failed to fetch');
+    el.innerHTML = `<div>✕ ${escHtml(msg)}</div>` +
+      (isCors ? `<div style="margin-top:10px;color:var(--muted);font-size:12px">
+        💡 <strong style="color:#fff">You must open this via a local server, not file://</strong><br><br>
+        In VS Code: right-click <code style="color:var(--lime)">index.html</code> → <strong style="color:#fff">Open with Live Server</strong><br>
+        The URL must start with <code style="color:var(--lime)">http://127.0.0.1</code> or <code style="color:var(--lime)">http://localhost</code> — not <code style="color:#ff6666">file:///</code>
+      </div>` : '');
+    el.classList.add('show');
+  }
+  function hideError() { document.getElementById('errorBox').classList.remove('show'); }
+  function showResults() { document.getElementById('results').classList.add('show'); }
+  function hideResults() { document.getElementById('results').classList.remove('show'); }
+
+  // ── MODAL ─────────────────────────────────────────────
+  function openModal() {
+    document.getElementById('apiKeyInput').value = getApiKey();
+    document.getElementById('modalHint').textContent = 'Must start with gsk_';
+    document.getElementById('modalHint').classList.remove('error');
+    document.getElementById('modalOverlay').classList.add('show');
+    setTimeout(() => document.getElementById('apiKeyInput').focus(), 100);
+  }
+  function closeModal() { document.getElementById('modalOverlay').classList.remove('show'); }
+
+  function validateKeyInput() {
+    const v = document.getElementById('apiKeyInput').value.trim();
+    const hint = document.getElementById('modalHint');
+    if (v && !v.startsWith('gsk_')) {
+      hint.textContent = '⚠ Key must start with gsk_';
+      hint.classList.add('error');
+    } else {
+      hint.textContent = 'Must start with gsk_';
+      hint.classList.remove('error');
+    }
+  }
+
+  function saveKey() {
+    const v = document.getElementById('apiKeyInput').value.trim();
+    if (!v.startsWith('gsk_')) {
+      document.getElementById('modalHint').textContent = '⚠ Invalid key format. Must start with gsk_';
+      document.getElementById('modalHint').classList.add('error');
+      return;
+    }
+    localStorage.setItem('cc_groq_key', v);
+    closeModal();
+    checkApiKey();
+  }
+
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+</script>
+</body>
+</html>
