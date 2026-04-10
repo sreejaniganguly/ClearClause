@@ -820,9 +820,9 @@
 <div class="modal-overlay" id="modalOverlay" onclick="if(event.target===this)closeModal()">
   <div class="modal">
     <div class="modal-title">API KEY</div>
-    <div class="modal-sub">Enter your Groq API key to enable document analysis.</div>
-    <label for="apiKeyInput">Groq API Key</label>
-    <input type="text" id="apiKeyInput" placeholder="gsk_..."
+    <div class="modal-sub">Enter your OpenRouter API key to enable document analysis.</div>
+    <label for="apiKeyInput">OpenRouter API Key</label>
+    <input type="text" id="apiKeyInput" placeholder="sk-or-..."
       autocomplete="off"
       autocorrect="off"
       autocapitalize="off"
@@ -830,7 +830,7 @@
       inputmode="text"
       style="-webkit-user-select:text;user-select:text;"
       oninput="validateKeyInput()">
-    <div class="modal-hint" id="modalHint">Must start with gsk_</div>
+    <div class="modal-hint" id="modalHint">Must start with sk-or-</div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeModal()">Cancel</button>
       <button class="btn-save" id="saveKeyBtn" onclick="saveKey()">SAVE</button>
@@ -846,8 +846,8 @@
   let currentLang = 'en';
   let highlightVisible = false;
 
-  const GROQ_ENDPOINT = 'https://api.groq.com/openai/v1/chat/completions';
-  const MODEL_ANALYZE = 'llama-3.3-70b-versatile';
+  const GROQ_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
+  const MODEL_ANALYZE = 'meta-llama/llama-3.3-70b-instruct';
   const MODEL_VISION  = 'meta-llama/llama-4-scout-17b-16e-instruct';
 
   // ── INIT ─────────────────────────────────────────────
@@ -856,7 +856,7 @@
     checkApiKey();
   });
 
-  function getApiKey() { return localStorage.getItem('cc_groq_key') || ''; }
+  function getApiKey() { return localStorage.getItem('cc_or_key') || ''; }
   function checkApiKey() {
     document.getElementById('warningBar').classList.toggle('show', !getApiKey());
   }
@@ -1290,7 +1290,7 @@ ${clauseCards}
   // ── MODAL ─────────────────────────────────────────────
   function openModal() {
     document.getElementById('apiKeyInput').value = getApiKey();
-    document.getElementById('modalHint').textContent = 'Must start with gsk_';
+    document.getElementById('modalHint').textContent = 'Must start with sk-or-';
     document.getElementById('modalHint').classList.remove('error');
     document.getElementById('modalOverlay').classList.add('show');
     setTimeout(() => document.getElementById('apiKeyInput').focus(), 100);
@@ -1300,23 +1300,23 @@ ${clauseCards}
   function validateKeyInput() {
     const v = document.getElementById('apiKeyInput').value.trim();
     const hint = document.getElementById('modalHint');
-    if (v && !v.startsWith('gsk_')) {
-      hint.textContent = '⚠ Key must start with gsk_';
+    if (v && !v.startsWith('sk-or-')) {
+      hint.textContent = '⚠ Key must start with sk-or-';
       hint.classList.add('error');
     } else {
-      hint.textContent = 'Must start with gsk_';
+      hint.textContent = 'Must start with sk-or-';
       hint.classList.remove('error');
     }
   }
 
   function saveKey() {
     const v = document.getElementById('apiKeyInput').value.trim();
-    if (!v.startsWith('gsk_')) {
-      document.getElementById('modalHint').textContent = '⚠ Invalid key format. Must start with gsk_';
+    if (!v.startsWith('sk-or-')) {
+      document.getElementById('modalHint').textContent = '⚠ Invalid key format. Must start with sk-or-';
       document.getElementById('modalHint').classList.add('error');
       return;
     }
-    localStorage.setItem('cc_groq_key', v);
+    localStorage.setItem('cc_or_key', v);
     closeModal();
     checkApiKey();
   }
